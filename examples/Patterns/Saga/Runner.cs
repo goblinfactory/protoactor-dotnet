@@ -15,8 +15,6 @@ namespace Saga
         private int _intervalBetweenConsoleUpdates;
         private readonly int _numberOfIterations;
         private readonly double _uptime;
-        private readonly double _refusalProbability;
-        private readonly double _busyProbability;
         private readonly int _retryAttempts;
         private readonly bool _verbose;
         private readonly HashSet<PID> _transfers = new HashSet<PID>();
@@ -25,21 +23,25 @@ namespace Saga
         private int _failedButConsistentResults;
         private int _unknownResults;
         private InMemoryProvider _inMemoryProvider;
+        private readonly ISagaConsole _transactionReporter;
+        private readonly ISagaConsole _resultReporter;
+        private readonly Probabilities _probabilities;
+        public Action<ISagaConsole> OnFinished = _ => { };
 
-        public Runner(int numberOfIterations, int intervalBetweenConsoleUpdates, double uptime, double refusalProbability, double busyProbability, int retryAttempts, bool verbose)
+        public Runner(ISagaConsole transactionReporter, ISagaConsole resultReporter, Probabilities probabilities, int numberOfIterations, int intervalBetweenConsoleUpdates, int retryAttempts, bool verbose)
         {
+            _transactionReporter = transactionReporter;
+            _resultReporter = resultReporter;
+            _probabilities = probabilities;
             _numberOfIterations = numberOfIterations;
             _intervalBetweenConsoleUpdates = intervalBetweenConsoleUpdates;
-            _uptime = uptime;
-            _refusalProbability = refusalProbability;
-            _busyProbability = busyProbability;
             _retryAttempts = retryAttempts;
             _verbose = verbose;
         }
 
-        private PID CreateAccount(string name, Random random)
+        private PID CreateAccount(string name)
         {
-            var accountProps = Props.FromProducer(() => new Account(name, _uptime, _refusalProbability, _busyProbability, random));
+            var accountProps = Props.FromProducer(() => Account.CreateAccountWithProbability(name, _probabilities));
             return Context.SpawnNamed(accountProps, name);
         }
 
@@ -67,17 +69,17 @@ namespace Saga
                     var random = new Random();
                     _inMemoryProvider = new InMemoryProvider();
                     new ForWithProgress(_numberOfIterations, _intervalBetweenConsoleUpdates, true, false).EveryNth( 
-                        i =>    Console.WriteLine($"Started {i}/{_numberOfIterations} processes"), 
+                        i =>    _transactionReporter.WriteLine($"Started {i}/{_numberOfIterations} processes"), 
                         (i, nth) => {
                             int j = i;
-                            var fromAccount = CreateAccount($"FromAccount{j}", random);
-                            var toAccount = CreateAccount($"ToAccount{j}", random);
+                            var fromAccount = CreateAccount($"FromAccount{j}");
+                            var toAccount = CreateAccount($"ToAccount{j}");
                             var actorName = $"Transfer Process {j}";
                             var persistanceID = $"Transfer Process {j}";
                             var factory = new TransferFactory(context, _inMemoryProvider, random, _uptime, _retryAttempts);
                             var transfer = factory.CreateTransfer(actorName, fromAccount, toAccount, 10, persistanceID);
                             _transfers.Add(transfer);
-                            if(i== _numberOfIterations && !nth) Console.WriteLine($"Started {j}/{_numberOfIterations} proesses");
+                            if(i== _numberOfIterations && !nth) _transactionReporter.WriteLine($"Started {j}/{_numberOfIterations} proesses");
                         });
                     break;
             }
@@ -94,42 +96,44 @@ namespace Saga
                 Console.Write(".");
                 if (remaining % (_numberOfIterations / _intervalBetweenConsoleUpdates) == 0)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine($"{remaining} processes remaining");
+                    _transactionReporter.WriteLine("");
+                    _transactionReporter.WriteLine($"{remaining} processes remaining");
                 }
             }
             else
             {
-                Console.WriteLine($"{remaining} processes remaining");
+                _transactionReporter.WriteLine($"{remaining} processes remaining");
             }
             
             if (remaining == 0)
             {
                 Thread.Sleep(250);
-                Console.WriteLine();
-                Console.WriteLine(
-                    $"RESULTS for {_uptime}% uptime, {_refusalProbability}% chance of refusal, {_busyProbability}% of being busy and {_retryAttempts} retry attempts:");
-                Console.WriteLine(
+                _resultReporter.WriteLine(
+                    $"RESULTS for {_uptime}% uptime, {_probabilities.RefusalProbability}% chance of refusal, {_probabilities.BusyProbability}% of being busy and {_retryAttempts} retry attempts:");
+                _resultReporter.WriteLine(
                     $"{AsPercentage(_numberOfIterations, _successResults)}% ({_successResults}/{_numberOfIterations}) successful transfers");
-                Console.WriteLine(
+                _resultReporter.WriteLine(
                     $"{AsPercentage(_numberOfIterations, _failedButConsistentResults)}% ({_failedButConsistentResults}/{_numberOfIterations}) failures leaving a consistent system");
-                Console.WriteLine(
+                _resultReporter.WriteLine(
                     $"{AsPercentage(_numberOfIterations, _failedAndInconsistentResults)}% ({_failedAndInconsistentResults}/{_numberOfIterations}) failures leaving an inconsistent system");
-                Console.WriteLine(
+                _resultReporter.WriteLine(
                     $"{AsPercentage(_numberOfIterations, _unknownResults)}% ({_unknownResults}/{_numberOfIterations}) unknown results");
                 
                 if (_verbose)
                 {
                     foreach (var stream in _inMemoryProvider.Events)
                     {
-                        Console.WriteLine();
-                        Console.WriteLine($"Event log for {stream.Key}");
+                        _resultReporter.WriteLine("");
+                        _resultReporter.WriteLine($"Event log for {stream.Key}");
                         foreach (var @event in stream.Value)
                         {
-                            Console.WriteLine(@event.Value);
+                            _resultReporter.WriteLine(@event.Value.ToString());
                         }
                     }
                 }
+
+                OnFinished(_resultReporter);
+
             }
         }
 

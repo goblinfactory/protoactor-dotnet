@@ -1,37 +1,21 @@
-﻿using System;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Win32.SafeHandles;
-using Proto;
+﻿using Proto;
+using Saga.Internal;
 
 namespace Saga
 {
+
     internal class Program
     {
         private static RootContext Context = RootContext.Empty;
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("Starting");
-            var random = new Random();
-            var numberOfTransfers = 5;
-            var intervalBetweenConsoleUpdates = 1;
-            var uptime = 99.99;
-            var retryAttempts = 0;
-            var refusalProbability = 0.01;
-            var busyProbability = 0.01;
-            bool verbose = false;
+            var console = new SagaConsole(System.ConsoleColor.White);
+            var results = new SagaConsole(System.ConsoleColor.Green);
+            var probabilities = new Probabilities(refusalProbability:0.01, busyProbability:0.01, serviceUptime :99.99, longRunningSimulationMs:150);
 
-            var props = Props.FromProducer(() => new Runner(numberOfTransfers, intervalBetweenConsoleUpdates, uptime, refusalProbability, busyProbability, retryAttempts, verbose))
-                .WithChildSupervisorStrategy(new OneForOneStrategy((pid, reason) => SupervisorDirective.Restart, retryAttempts, null));
-            
-            Console.WriteLine("Spawning runner");
-            var runner = Context.SpawnNamed(props, "runner");
-           
-            Console.ReadLine();
+            var saga = new SagaProgram(console, results, probabilities, false);
+            saga.Run();
         }
     }
 }

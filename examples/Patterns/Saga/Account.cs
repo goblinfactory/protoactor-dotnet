@@ -3,27 +3,32 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Proto;
+using Saga.Internal;
 using Saga.Messages;
 
 namespace Saga
 {
-    class Account : IActor
+    partial class Account : IActor
     {
         private readonly string _name;
-        private readonly double _serviceUptime;
-        private readonly double _refusalProbability;
-        private readonly double _busyProbability;
         private readonly Dictionary<PID, object> _processedMessages = new Dictionary<PID, object>();
         private decimal _balance = 10;
-        private readonly Random _random;
 
-        public Account(string name, double serviceUptime, double refusalProbability, double busyProbability, Random random)
+        public IChaosMonkey Monkey { get; set;  } = new ImNoMonkey(150);
+
+        public Account(string name)
         {
             _name = name;
-            _serviceUptime = serviceUptime;
-            _refusalProbability = refusalProbability;
-            _busyProbability = busyProbability;
-            _random = random;
+        }
+
+        private static int seed;
+
+        public static Account CreateAccountWithProbability(string name, Probabilities probabilities)
+        {
+            var monkey = new ChaosMonkey(Interlocked.Increment(ref seed), probabilities);
+            var account = new Account(name);
+            account.Monkey = monkey;
+            return account;
         }
 
         public Task ReceiveAsync(IContext context)
@@ -65,22 +70,23 @@ namespace Saga
         /// </summary>
         private Task AdjustBalance(PID replyTo, decimal amount)
         {
-            if (RefusePermanently())
+            if (Monkey.Refuse())
             {
                 _processedMessages.Add(replyTo, new Refused());
                 replyTo.Tell(new Refused());
             }
                 
-            if (Busy())
+            if (Monkey.Busy())
                 replyTo.Tell(new ServiceUnavailable());
-            
+
             // generate the behavior to be used whilst processing this message
-            var behaviour = DetermineProcessingBehavior();
-            if (behaviour == Behavior.FailBeforeProcessing)
+            var behaviour = Monkey.AmIInTheMoodToday();
+
+            if (behaviour == FailBehavior.FailBeforeProcessing)
                 return Failure(replyTo);
-            
+
             // simulate potential long-running process
-            Thread.Sleep(_random.Next(0, 150));
+            Monkey.LongRunningProcessSimulation();
             
             _balance += amount;
             _processedMessages.Add(replyTo, new OK());
@@ -88,24 +94,11 @@ namespace Saga
             // simulate chance of failure after applying the change. This will
             // force a retry of the operation which will test the operation
             // is idempotent
-            if (behaviour == Behavior.FailAfterProcessing)
+            if (behaviour == FailBehavior.FailAfterProcessing)
                 return Failure(replyTo);
-            
+
             replyTo.Tell(new OK());
             return Actor.Done;
-        }
-
-        private bool Busy()
-        {
-            var comparsion = _random.NextDouble() * 100;
-            return comparsion <= _busyProbability;
-        }
-
-        private bool RefusePermanently()
-        {
-            
-            var comparsion = _random.NextDouble() * 100;
-            return comparsion <= _refusalProbability;
         }
 
         private Task Failure(PID replyTo)
@@ -114,28 +107,9 @@ namespace Saga
             return Actor.Done;
         }
 
-        private Behavior DetermineProcessingBehavior()
-        {
-            var comparision = _random.NextDouble() * 100;
-            if (comparision > _serviceUptime)
-            {
-                return _random.NextDouble() * 100 > 50 ? Behavior.FailBeforeProcessing : Behavior.FailAfterProcessing;
-            }
-            return Behavior.ProcessSuccessfully;
-        }
-
         private bool AlreadyProcessed(PID replyTo)
         {
             return _processedMessages.ContainsKey(replyTo);
         }
-
-        private enum Behavior
-        {
-            FailBeforeProcessing,
-            FailAfterProcessing,
-            ProcessSuccessfully
-        }
-    }
-    
-    
+    }    
 }
