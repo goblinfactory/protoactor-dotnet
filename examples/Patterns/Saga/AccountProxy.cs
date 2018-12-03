@@ -33,12 +33,13 @@ namespace Saga
                     context.CancelReceiveTimeout();
                     context.Parent.Tell(msg);
                     break;
+
                 // This emulates a failed remote call
                 case InsufficientFunds _:
                 case InternalServerError _:
                 case ReceiveTimeout _:
                 case ServiceUnavailable _: //TODO - this gives us more information than a failure
-                    throw new Exception();
+                    throw new Exception($"Error :{context.Message.GetType().Name}");
             }
             
             return Actor.Done;
