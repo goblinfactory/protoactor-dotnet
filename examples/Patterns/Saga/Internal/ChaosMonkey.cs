@@ -47,7 +47,8 @@ namespace Saga
 
         public void LongRunningProcessSimulation()
         {
-            Thread.Sleep(_random.Next(0, LongRunningSimulationMs));
+            int sleep = _random.Next(0, LongRunningSimulationMs);
+            Thread.Sleep(sleep);
         }
     }
     

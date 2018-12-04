@@ -29,7 +29,7 @@ namespace Saga
             return Task.FromResult(0L);
         }
 
-        public Task PersistEventAsync(string actorName, long index, object @event)
+        public Task<long> PersistEventAsync(string actorName, long index, object @event)
         {
             var events = Events.GetOrAdd(actorName, new Dictionary<long, object>());
             long nextEventIndex = 1;
@@ -39,12 +39,7 @@ namespace Saga
             }
             events.Add(nextEventIndex, @event);
 
-            return Task.FromResult(0);
-        }
-
-        public Task PersistSnapshotAsync(string actorName, long index, object snapshot)
-        {
-            return Task.FromResult(0);
+            return Task.FromResult(0L);
         }
 
         public Task DeleteEventsAsync(string actorName, long inclusiveToIndex)
@@ -61,12 +56,12 @@ namespace Saga
             return Task.FromResult(0);
         }
 
-        public Task DeleteSnapshotsAsync(string actorName, long inclusiveToIndex)
+        public Task PersistSnapshotAsync(string actorName, long index, object snapshot)
         {
-            return Task.FromResult(0L);
+            return Task.FromResult(0);
         }
 
-        Task<long> IEventStore.PersistEventAsync(string actorName, long index, object @event)
+        public Task DeleteSnapshotsAsync(string actorName, long inclusiveToIndex)
         {
             return Task.FromResult(0L);
         }

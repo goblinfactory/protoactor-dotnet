@@ -11,7 +11,7 @@
  > a long-lived transaction that can be written as a sequence of transactions that can be interleaved with other transactions 
  
  It also says that 
- > the system guarentees that either all the transactions in a saga are successfully completed or compensatmg transactions are run to amend a  partial execution 
+ > the system guarantees that either all the transactions in a saga are successfully completed or compensating transactions are run to amend a  partial execution 
  
  For each step in a business process, given a failure, there should be a compensating step that rolls-back the state of the system to what it would have been before the step was applied. The whole process is managed by something called a Saga Execution Component. A good introduction to the Saga pattern is [Distributed Sagas: A Protocol for Coordinating Microservices](https://www.youtube.com/watch?v=0UTOLRTwOX0&t=1696s) by Caitie McCaffrey, 
  
@@ -62,8 +62,8 @@ On the face of it this is a simple problem. However, things get more interesting
   
   In the preceding section we descovered scenarios where we are not sure what state the system is in. Even with retries and compensating actions, things can still go wrong. In an ideal world, these should be very rare! However, they can occur and in these cases it's best to have a fallback strategy, escalating the result of the saga to something else, quite possibly a manual / human process. 
    
-  ### Atomicitiy
-  One thing a saga does not provide is atomicitiy. In the bank account example above there's nothing to stop other systems interacting with the accounts in-between the debit and the credit operations. This needs bearing in mind as it could rule out the saga pattern for some types of operations.
+  ### Atomicity
+  One thing a saga does not provide is atomicity. In the bank account example above there's nothing to stop other systems interacting with the accounts in-between the debit and the credit operations. This needs bearing in mind as it could rule out the saga pattern for some types of operations.
   
   ___
   

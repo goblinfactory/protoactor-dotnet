@@ -35,7 +35,6 @@ namespace Saga
 
             var props = Props.FromProducer(() =>
             {
-                var monkey = new ChaosMonkey(_seed, _probabilities);
                 var run = new Runner(
                     _console,
                     _resultConsole,

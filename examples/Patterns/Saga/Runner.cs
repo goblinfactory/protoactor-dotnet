@@ -66,7 +66,7 @@ namespace Saga
                     CheckForCompletion(msg.Pid);
                     break;
                 case Started _:
-                    var random = new Random();
+                    var random = new Random(); // TODO: need to be able to seed this!
                     _inMemoryProvider = new InMemoryProvider();
                     new ForWithProgress(_numberOfIterations, _intervalBetweenConsoleUpdates, true, false).EveryNth( 
                         i =>    _transactionReporter.WriteLine($"Started {i}/{_numberOfIterations} processes"), 
